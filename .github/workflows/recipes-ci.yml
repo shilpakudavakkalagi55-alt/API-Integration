@@ -1,0 +1,36 @@
+name: CI — Recipe summary
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  recipe-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show repo summary
+        run: |
+          echo "Files in workspace:"
+          ls -la
+
+      - name: Fetch recipes from DummyJSON and summarize
+        run: |
+          set -e
+          echo "Fetching https://dummyjson.com/recipes"
+          curl -sS https://dummyjson.com/recipes -o recipes.json
+          echo "Saved recipes.json (size: $(wc -c < recipes.json) bytes)"
+          # install jq if it's missing
+          if ! command -v jq >/dev/null; then
+            sudo apt-get update -y && sudo apt-get install -y jq
+          fi
+          echo "Count of recipes: $(jq '.recipes | length' recipes.json)"
+          echo "Top 6 recipes (name, servings, prepTimeMinutes, cookTimeMinutes):"
+          jq -r '.recipes[:6][] | "- \(.name) (servings: \(.servings) prep: \(.prepTimeMinutes)min cook: \(.cookTimeMinutes)min)"' recipes.json
+
+      - name: Print index.html preview
+        run: |
+          echo '--- index.html (first 80 lines) ---'
+          sed -n '1,80p' index.html || true

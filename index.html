@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Finder</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f4f6fa;
+        }
+        header {
+            background: #2d3e50;
+            color: #fff;
+            padding: 1rem 2rem;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        header .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display:flex; align-items:center; justify-content:space-between;
+        }
+        .auth-controls {
+            display:flex; gap:0.5rem; align-items:center;
+        }
+        .icon-btn {
+            background: transparent; border: none; color: #fff; cursor:pointer; padding:0.25rem 0.5rem; border-radius:6px;
+            display:inline-flex; align-items:center; gap:0.5rem; font-size:0.95rem;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,0.04); }
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+        .filter-bar input,
+        .filter-bar select,
+        .filter-bar label {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            width: 300px;
+            max-width: 90vw;
+        }
+        .filter-controls {
+            display:flex; gap:0.5rem; align-items:center;
+        }
+        .fav-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: #e74c3c;
+        }
+        .fav-btn[aria-pressed="true"] {
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
+            transform: translateY(-1px);
+        }
+        /* modal styles */
+        .modal {
+            position: fixed; inset: 0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.35); z-index: 80;
+        }
+        .modal[aria-hidden="false"] { display:flex; }
+        .modal-content {
+            background: #fff; border-radius: 8px; padding: 1rem; width: min(520px, 95vw); box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+        }
+        .modal .modal-close { background: transparent; border:none; font-size:1.1rem; cursor:pointer; float:right }
+        .modal-content form { display:flex; flex-direction:column; gap:0.5rem }
+        .modal-content input { padding:0.5rem; border-radius:6px; border:1px solid #ccc }
+        section {
+            margin-bottom: 2rem;
+        }
+        .recipe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 2rem;
+        }
+        article.recipe {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: box-shadow 0.2s;
+        }
+        .recipe-actions {
+            display:flex; gap:0.5rem; width:100%; justify-content:center; margin-top:0.5rem;
+        }
+        .badge {
+            background:#f1f3f6; color:#333; padding:0.2rem 0.5rem; border-radius:6px; font-size:0.85rem;
+        }
+        article.recipe:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+        }
+        article.recipe img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        article.recipe h2 {
+            font-size: 1.2rem;
+            margin: 0.5rem 0 0.2rem 0;
+            text-align: center;
+        }
+        article.recipe p {
+            margin: 0.2rem 0;
+            text-align: center;
+        }
+        footer {
+            background: #2d3e50;
+            color: #fff;
+            text-align: center;
+            padding: 1rem 0.5rem;
+            font-size: 0.95rem;
+        }
+        @media (max-width: 600px) {
+            main {
+                padding: 0.5rem;
+            }
+            header {
+                padding: 0.7rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <h1>Recipe Finder</h1>
+            <div class="auth-controls">
+                <button id="loginBtn" class="icon-btn" title="Login">🔐 Login</button>
+                <button id="registerBtn" class="icon-btn" title="Register">✍️ Register</button>
+                <div id="userState" style="display:none; color:#fff; align-items:center; gap:0.5rem">
+                    <span id="usernameDisplay"></span>
+                    <button id="logoutBtn" class="icon-btn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main>
+        <section class="filter-bar">
+            <label for="filter" style="display:none">Filter recipes by name</label>
+            <input type="text" id="filter" placeholder="Search recipes by name..." autocomplete="off" />
+            <div class="filter-controls" aria-hidden="false">
+                <select id="sort">
+                    <option value="name-asc">Name (A → Z)</option>
+                    <option value="name-desc">Name (Z → A)</option>
+                    <option value="prep-asc">Prep time (low → high)</option>
+                    <option value="prep-desc">Prep time (high → low)</option>
+                    <option value="cook-asc">Cook time (low → high)</option>
+                    <option value="cook-desc">Cook time (high → low)</option>
+                    <option value="servings-asc">Servings (low → high)</option>
+                    <option value="servings-desc">Servings (high → low)</option>
+                </select>
+                <label>
+                    <input type="checkbox" id="show-fav" /> Show favorites only
+                </label>
+            </div>
+        </section>
+        <section>
+            <div id="recipes" class="recipe-grid" aria-live="polite">Loading recipes...</div>
+        </section>
+    </main>
+    <footer>
+        &copy; 2025 Recipe Finder. Powered by DummyJSON API.
+    </footer>
+    <!-- Auth modals -->
+    <div id="loginModal" class="modal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-labelledby="loginTitle">
+            <button class="modal-close" aria-label="Close">✖</button>
+            <h3 id="loginTitle">Login</h3>
+            <form id="loginForm">
+                <label for="login-username">Username or Email</label>
+                <input id="login-username" required />
+                <label for="login-password">Password</label>
+                <input id="login-password" type="password" required />
+                <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+                    <button type="submit">Login</button>
+                    <button type="button" id="openRegisterFromLogin">Register</button>
+                </div>
+                <p id="login-error" style="color:#e74c3c"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="registerModal" class="modal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-labelledby="registerTitle">
+            <button class="modal-close" aria-label="Close">✖</button>
+            <h3 id="registerTitle">Register</h3>
+            <form id="registerForm">
+                <label for="reg-username">Username</label>
+                <input id="reg-username" required />
+                <label for="reg-email">Email</label>
+                <input id="reg-email" type="email" required />
+                <label for="reg-password">Password</label>
+                <input id="reg-password" type="password" required />
+                <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+                    <button type="submit">Create account</button>
+                </div>
+                <p id="register-error" style="color:#e74c3c"></p>
+            </form>
+        </div>
+    </div>
+    <script>
+    let allRecipes = [];
+    const recipesContainer = document.getElementById('recipes');
+    const filterInput = document.getElementById('filter');
+    const sortSelect = document.getElementById('sort');
+    const showFavCheckbox = document.getElementById('show-fav');
+
+    // favorites stored as an object of id:true for fast lookup
+    const FAVORITES_KEY = 'recipe_favorites_v1';
+    let favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '{}');
+
+    // Auth / users (simple client-side demo using localStorage)
+    const USERS_KEY = 'recipe_users_v1';
+    const AUTH_KEY = 'recipe_current_user_v1';
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const loginModal = document.getElementById('loginModal');
+    const registerModal = document.getElementById('registerModal');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const userState = document.getElementById('userState');
+    const usernameDisplay = document.getElementById('usernameDisplay');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    function getUsers() { return JSON.parse(localStorage.getItem(USERS_KEY) || '{}'); }
+    function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+    function setCurrentUser(user) { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); updateAuthUI(); }
+    function clearCurrentUser(){ localStorage.removeItem(AUTH_KEY); updateAuthUI(); }
+    function getCurrentUser() { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); }
+
+    // modal helpers
+    function openModal(modal){ modal.setAttribute('aria-hidden','false'); }
+    function closeModal(modal){ modal.setAttribute('aria-hidden','true'); }
+
+    // update header based on auth
+    function updateAuthUI(){
+        const current = getCurrentUser();
+        if (current) {
+            loginBtn.style.display = 'none';
+            registerBtn.style.display = 'none';
+            userState.style.display = 'inline-flex';
+            usernameDisplay.textContent = current.username || current.email;
+        } else {
+            loginBtn.style.display = '';
+            registerBtn.style.display = '';
+            userState.style.display = 'none';
+            usernameDisplay.textContent = '';
+        }
+    }
+
+    // wire up open/close
+    loginBtn.addEventListener('click', ()=>{ openModal(loginModal); });
+    registerBtn.addEventListener('click', ()=>{ openModal(registerModal); });
+    Array.from(document.querySelectorAll('.modal .modal-close')).forEach(b => b.addEventListener('click', e => {
+        const modal = e.target.closest('.modal'); closeModal(modal);
+    }));
+
+    // quick link from login modal to register
+    document.getElementById('openRegisterFromLogin').addEventListener('click', ()=>{ closeModal(loginModal); openModal(registerModal); });
+
+    // registration
+    registerForm.addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const u = document.getElementById('reg-username').value.trim();
+        const em = document.getElementById('reg-email').value.trim().toLowerCase();
+        const pw = document.getElementById('reg-password').value;
+        const err = document.getElementById('register-error'); err.textContent = '';
+        if (!u || !em || !pw) { err.textContent = 'Please fill all fields.'; return; }
+        const users = getUsers();
+        if (users[u] || Object.values(users).some(x => x.email === em)) { err.textContent = 'Username or email already exists.'; return; }
+        users[u] = { email: em, password: pw };
+        saveUsers(users);
+        // auto-login
+        setCurrentUser({ username: u, email: em });
+        closeModal(registerModal);
+    });
+
+    // login
+    loginForm.addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const who = document.getElementById('login-username').value.trim();
+        const pw = document.getElementById('login-password').value;
+        const err = document.getElementById('login-error'); err.textContent = '';
+        if (!who || !pw) { err.textContent = 'Please fill both fields.'; return; }
+        const users = getUsers();
+        // find by username or email
+        const found = Object.entries(users).find(([uname, info]) => uname === who || info.email === who);
+        if (!found) { err.textContent = 'User not found.'; return; }
+        const [uname, info] = found;
+        if (info.password !== pw) { err.textContent = 'Incorrect password.'; return; }
+        setCurrentUser({ username: uname, email: info.email });
+        closeModal(loginModal);
+    });
+
+    logoutBtn.addEventListener('click', ()=>{ clearCurrentUser(); });
+
+    // initialize auth UI on load
+    updateAuthUI();
+
+    function renderRecipes(recipes) {
+        if (!recipes.length) {
+            recipesContainer.innerHTML = '<p>No recipes found.</p>';
+            return;
+        }
+        recipesContainer.innerHTML = recipes.map(recipe => {
+            const isFav = Boolean(favorites[recipe.id]);
+            return `
+            <article class="recipe" data-id="${recipe.id}">
+                <img src="${recipe.image}" alt="${recipe.name}" />
+                <h2>${recipe.name}</h2>
+                <p><strong>Prep Time:</strong> ${recipe.prepTimeMinutes} min</p>
+                <p><strong>Cook Time:</strong> ${recipe.cookTimeMinutes} min</p>
+                <p><strong>Servings:</strong> ${recipe.servings}</p>
+                <div class="recipe-actions">
+                    <button class="fav-btn" aria-pressed="${isFav}" data-id="${recipe.id}" title="Toggle favorite">${isFav ? '♥' : '♡'}</button>
+                    <span class="badge">${recipe.tags ? recipe.tags.join(', ') : ''}</span>
+                </div>
+            </article>
+        `;
+        }).join('');
+    }
+
+    // handle favorite toggle clicking using event delegation
+    recipesContainer.addEventListener('click', e => {
+        const btn = e.target.closest('.fav-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        if (!id) return;
+        const isFav = Boolean(favorites[id]);
+        if (isFav) {
+            delete favorites[id];
+        } else {
+            favorites[id] = true;
+        }
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+        applyFiltersAndSort();
+    });
+
+    function applyFiltersAndSort() {
+        const query = filterInput.value.trim().toLowerCase();
+        const showFav = showFavCheckbox.checked;
+
+        // filter by search query
+        let results = allRecipes.filter(r => r.name.toLowerCase().includes(query));
+
+        // if show favorites only, filter by favorites object
+        if (showFav) {
+            results = results.filter(r => Boolean(favorites[r.id]));
+        }
+
+        // apply sorting
+        const sortValue = sortSelect.value;
+        results.sort((a, b) => {
+            switch (sortValue) {
+                case 'name-asc': return a.name.localeCompare(b.name);
+                case 'name-desc': return b.name.localeCompare(a.name);
+                case 'prep-asc': return (a.prepTimeMinutes || 0) - (b.prepTimeMinutes || 0);
+                case 'prep-desc': return (b.prepTimeMinutes || 0) - (a.prepTimeMinutes || 0);
+                case 'cook-asc': return (a.cookTimeMinutes || 0) - (b.cookTimeMinutes || 0);
+                case 'cook-desc': return (b.cookTimeMinutes || 0) - (a.cookTimeMinutes || 0);
+                case 'servings-asc': return (a.servings || 0) - (b.servings || 0);
+                case 'servings-desc': return (b.servings || 0) - (a.servings || 0);
+                default: return 0;
+            }
+        });
+
+        renderRecipes(results);
+    }
+
+    fetch('https://dummyjson.com/recipes')
+        .then(res => res.json())
+        .then(data => {
+            allRecipes = data.recipes;
+            // apply filters + sorting (this respects favorites and current sort/filters)
+            applyFiltersAndSort();
+        })
+        .catch(err => {
+            console.error('Fetch error:', err);
+            recipesContainer.innerHTML = '<p>Failed to load recipes.</p>';
+        });
+
+    filterInput.addEventListener('input', applyFiltersAndSort);
+    sortSelect.addEventListener('change', applyFiltersAndSort);
+    showFavCheckbox.addEventListener('change', applyFiltersAndSort);
+    </script>
+</body>
+</html>
